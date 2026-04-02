@@ -58,7 +58,7 @@ function Invoke-GitVisible {
 	}
 	Write-Host "  === fin (código salida: $ec) ===" -ForegroundColor $(if ($ec -eq 0) { 'DarkGray' } else { 'Red' })
 	$script:SubirGithubLastGitExit = $ec
-	return ,$ec
+	# No devolver $ec: si no se asigna la llamada, PowerShell imprimiría "0" en consola.
 }
 
 function Show-Menu {
