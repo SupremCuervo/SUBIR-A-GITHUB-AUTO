@@ -45,9 +45,19 @@ function Invoke-GitVisible {
 	$line = Format-GitArgsDisplay $GitArguments
 	Write-Host ""
 	Write-Host "  === git $line ===" -ForegroundColor Cyan
-	& git @GitArguments
+	# Capturar salida aquí: si no, al hacer "$ec = Invoke-GitVisible" PowerShell mete el texto de git
+	# en la variable y el código de salida se pierde (parece fallo aunque git devolvió 0).
+	$gitOut = & git @GitArguments 2>&1
 	$ec = $LASTEXITCODE
+	foreach ($item in @($gitOut)) {
+		if ($item -is [System.Management.Automation.ErrorRecord]) {
+			Write-Host "  $($item.ToString())" -ForegroundColor Red
+		} else {
+			Write-Host "  $item"
+		}
+	}
 	Write-Host "  === fin (código salida: $ec) ===" -ForegroundColor $(if ($ec -eq 0) { 'DarkGray' } else { 'Red' })
+	$script:SubirGithubLastGitExit = $ec
 	return ,$ec
 }
 
@@ -104,7 +114,8 @@ function New-RepoFlow {
 			}
 		}
 		Write-Step "Inicializar repositorio (git init en esta carpeta)"
-		$ec = Invoke-GitVisible @('init')
+		Invoke-GitVisible @('init')
+		$ec = $script:SubirGithubLastGitExit
 		if ($ec -ne 0) {
 			Write-Host "  Error en git init." -ForegroundColor Red
 			Read-Host "  Pulsa Enter"
@@ -118,7 +129,8 @@ function New-RepoFlow {
 	Write-Host "  === fin ===" -ForegroundColor DarkGray
 
 	Write-Step "Añadir remoto GitHub"
-	$ec = Invoke-GitVisible @('remote', 'add', 'origin', $remoteUrl)
+	Invoke-GitVisible @('remote', 'add', 'origin', $remoteUrl)
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  Error al añadir remote. ¿Ya existe 'origin'? Prueba opción 2 o elimina .git (3)." -ForegroundColor Red
 		Read-Host "  Pulsa Enter"
@@ -128,7 +140,8 @@ function New-RepoFlow {
 	& git remote -v
 
 	Write-Step "Añadir archivos al área de preparación (git add .)"
-	$ec = Invoke-GitVisible @('add', '.')
+	Invoke-GitVisible @('add', '.')
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  Error en git add." -ForegroundColor Red
 		Read-Host "  Pulsa Enter"
@@ -139,7 +152,8 @@ function New-RepoFlow {
 	Write-Host ""
 
 	Write-Step "Crear commit"
-	$ec = Invoke-GitVisible @('commit', '-m', $commitMsg)
+	Invoke-GitVisible @('commit', '-m', $commitMsg)
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  No hay cambios para commitear o hubo error (¿nada que añadir?)." -ForegroundColor Yellow
 		Read-Host "  Pulsa Enter"
@@ -150,10 +164,11 @@ function New-RepoFlow {
 	Write-Host ""
 
 	Write-Step "Renombrar rama local a main"
-	$null = Invoke-GitVisible @('branch', '-M', 'main')
+	Invoke-GitVisible @('branch', '-M', 'main')
 
 	Write-Step "Subir a GitHub (push)"
-	$ec = Invoke-GitVisible @('push', '-u', 'origin', 'main')
+	Invoke-GitVisible @('push', '-u', 'origin', 'main')
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  Error en push. Revisa credenciales, rama remota y que el repo en GitHub esté vacío o permita push." -ForegroundColor Red
 		Read-Host "  Pulsa Enter"
@@ -235,7 +250,8 @@ function Existing-RepoFlow {
 	}
 
 	Write-Step "Añadir cambios (git add .)"
-	$ec = Invoke-GitVisible @('add', '.')
+	Invoke-GitVisible @('add', '.')
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  Error en git add." -ForegroundColor Red
 		Read-Host "  Pulsa Enter"
@@ -246,7 +262,8 @@ function Existing-RepoFlow {
 	Write-Host ""
 
 	Write-Step "Crear commit"
-	$ec = Invoke-GitVisible @('commit', '-m', $commitMsg)
+	Invoke-GitVisible @('commit', '-m', $commitMsg)
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  Sin cambios nuevos o error en commit. Si no hay nada que commitear, puedes hacer solo push (ejecuta manualmente: git push origin $branch)." -ForegroundColor Yellow
 		$doPush = Read-Host "  ¿Intentar push igual? (s/N)"
@@ -264,7 +281,8 @@ function Existing-RepoFlow {
 	}
 
 	Write-Step "Subir rama a GitHub (push)"
-	$ec = Invoke-GitVisible @('push', 'origin', $branch)
+	Invoke-GitVisible @('push', 'origin', $branch)
+	$ec = $script:SubirGithubLastGitExit
 	if ($ec -ne 0) {
 		Write-Host "  Error en push." -ForegroundColor Red
 		Read-Host "  Pulsa Enter"
