@@ -10,76 +10,143 @@ El modelo evoluciona con migraciones; referencia principal: `supabase/` (p. ej. 
 
 ---
 
-## Diagrama (visión general)
+## Diagrama entidad-relación (en español, sin abreviaturas)
 
-El diagrama resume **relaciones principales**. Algunas tablas tienen reglas extra (por ejemplo, un alumno en padrón debe tener enlace por token **o** por sección del catálogo).
+### Cómo leer el gráfico
 
-El bloque siguiente usa **códigos cortos** y **etiquetas solo en ASCII** para que GitHub pueda renderizar Mermaid sin error (el renderizador de GitHub suele fallar con `erDiagram` muy largos, guiones bajos en nombres o caracteres acentuados en etiquetas). Leyenda justo debajo.
+En los diagramas siguientes, **cada nombre de entidad es el nombre real de la tabla** en la base de datos (por ejemplo `padron_alumnos`).
+
+- **Línea entre dos tablas:** hay un **vínculo** mediante clave foránea: registros de una tabla **referencian** registros de la otra.
+- **Símbolos en `erDiagram` (Mermaid):** resumen la **cardinalidad** (cuántos registros de un lado pueden ir con cuántos del otro). En lenguaje sencillo:
+  - **Uno a muchos:** una fila de la tabla de la izquierda puede relacionarse con **varias** filas de la de la derecha.
+  - **Uno a cero o uno:** como máximo **una** fila del otro lado (o ninguna).
+- **Regla del expediente:** en `padron_alumnos` cada alumno debe tener enlace por **`grupo_tokens`** y/o por **`institucion_grupos`**, según el caso (al menos uno de los dos caminos).
+
+El modelo está en **tres gráficos** para entenderlo por partes y para que el visor (por ejemplo GitHub) lo dibuje con menos fallos.
+
+---
+
+### Gráfico 1 — Alumno, sección, clave, carrera, cuenta y documentos
+
+Responde a: *¿en qué sección está?, ¿qué clave usó?, ¿tiene carrera?, ¿tiene cuenta en la web?, ¿qué documentos subió?*
 
 ```mermaid
 erDiagram
-    IG ||--o| GT : section_token
-    GT ||--o{ PA : roster_token
-    IG ||--o{ PA : roster_section
-    CR ||--o{ PA : career
-    PA ||--o| CA : account
-    CA ||--o{ ED : uploads
-    OR ||--o{ CG : creates
-    CG ||--o{ CL : lines
-    PA ||--o| CL : roster_line
-    OR ||--o{ OIG : staff
-    IG ||--o{ OIG : section
-    OSF ||--o{ PIG : semester
-    IG ||--o{ PIG : section_sem
-    OR ||--o{ OSA : reviews
+    institucion_grupos ||--o| grupo_tokens : "cada seccion tiene como maximo una clave"
+    grupo_tokens ||--o{ padron_alumnos : "la clave agrupa expedientes"
+    institucion_grupos ||--o{ padron_alumnos : "el expediente queda en una seccion"
+    carreras ||--o{ padron_alumnos : "carrera elegida desde segundo grado"
+    padron_alumnos ||--o| cuentas_alumno : "un expediente una cuenta web"
+    cuentas_alumno ||--o{ entregas_documento_alumno : "varios tipos de documento por cuenta"
 ```
 
-| Código | Tabla real |
-|--------|------------|
-| IG | `institucion_grupos` |
-| GT | `grupo_tokens` |
-| PA | `padron_alumnos` |
-| CR | `carreras` |
-| CA | `cuentas_alumno` |
-| ED | `entregas_documento_alumno` |
-| OR | `orientadores` |
-| CG | `cargas_alumnos` |
-| CL | `carga_alumnos_linea` |
-| OSF | `orientador_semestre_fechas` |
-| PIG | `periodo_institucion_grupos` |
-| OIG | `orientador_institucion_grupos` |
-| OSA | `orientador_solicitudes_acceso` |
+**Explicación de cada relación del gráfico 1**
 
-*Alternativa si aún así no se ve en GitHub:* pegar el mismo `erDiagram` en [mermaid.live](https://mermaid.live) o usar una extensión Mermaid en el editor.
+| Relación (de → hacia) | Qué significa en la práctica |
+|------------------------|------------------------------|
+| `institucion_grupos` → `grupo_tokens` | Una **sección** del catálogo puede tener **como mucho una** clave de acceso; también puede no tenerla. |
+| `grupo_tokens` → `padron_alumnos` | Cada **clave de grupo** concentra los **expedientes** de alumnos que entraron con esa clave. |
+| `institucion_grupos` → `padron_alumnos` | El **expediente** sabe en qué **sección** (grado + letra) está el alumno. |
+| `carreras` → `padron_alumnos` | El alumno puede tener una **carrera** del catálogo cuando el grado lo requiere. |
+| `padron_alumnos` → `cuentas_alumno` | Hay **como máximo una cuenta web** por expediente. |
+| `cuentas_alumno` → `entregas_documento_alumno` | Desde la cuenta se registran **varias entregas** (una por tipo de documento). |
 
-### Bloque alumnos y documentos
+**Vista de flujo (mismo bloque, más visual)**
+
+```mermaid
+flowchart TB
+    subgraph escuela["Escuela: secciones y claves"]
+        ig["institucion_grupos\n(catálogo grado y letra)"]
+        gt["grupo_tokens\n(clave de acceso)"]
+    end
+    subgraph alumno["Expediente y panel del alumno"]
+        pa["padron_alumnos"]
+        cr["carreras"]
+        ca["cuentas_alumno"]
+        ed["entregas_documento_alumno"]
+    end
+    ig --- gt
+    gt --> pa
+    ig --> pa
+    cr -.-> pa
+    pa --> ca
+    ca --> ed
+```
+
+La línea **punteada** indica que la relación con `carreras` está en los datos del expediente (`padron_alumnos`), no que el flujo “pase” primero por la tabla carreras.
+
+---
+
+### Gráfico 2 — Orientador, cargas masivas y secciones asignadas
+
+Responde a: *¿quién creó la encarga?, qué filas tiene?, a qué expediente enlaza cada fila?, qué secciones ve cada orientador?*
+
+```mermaid
+erDiagram
+    orientadores ||--o{ cargas_alumnos : "orientador crea encargas o cargas"
+    cargas_alumnos ||--o{ carga_alumnos_linea : "cada carga tiene muchas filas"
+    padron_alumnos ||--o| carga_alumnos_linea : "cada fila enlaza un expediente"
+    orientadores ||--o{ orientador_institucion_grupos : "orientador con secciones asignadas"
+    institucion_grupos ||--o{ orientador_institucion_grupos : "seccion en la asignacion"
+```
+
+**Explicación de cada relación del gráfico 2**
+
+| Relación | Qué significa |
+|----------|----------------|
+| `orientadores` → `cargas_alumnos` | Un orientador puede crear **varias cargas** (lotes con fecha de cierre y grupos). |
+| `cargas_alumnos` → `carga_alumnos_linea` | Cada carga tiene **muchas líneas** (un alumno por fila dentro del lote). |
+| `padron_alumnos` → `carga_alumnos_linea` | Cada línea **apunta a un expediente** del padrón (es el mismo alumno, no una copia). |
+| `orientadores` + `orientador_institucion_grupos` + `institucion_grupos` | Tabla puente: indica **qué secciones** puede atender cada orientador si la escuela usa esa regla. |
 
 ```mermaid
 flowchart LR
-    subgraph SCH[School sections]
-        IG2[institucion_grupos]
-        GT2[grupo_tokens]
+    subgraph personal["Personal"]
+        ori["orientadores"]
     end
-    subgraph STU[Student]
-        P2[padron_alumnos]
-        C2[cuentas_alumno]
-        E2[entregas_documento_alumno]
+    subgraph encarga["Encarga masiva"]
+        cga["cargas_alumnos"]
+        cal["carga_alumnos_linea"]
     end
-    IG2 --- GT2
-    GT2 --> P2
-    IG2 --> P2
-    P2 --> C2
-    C2 --> E2
+    ori --> cga
+    cga --> cal
+    cal --> padr["padron_alumnos"]
 ```
 
-### Bloque cargas e inscripcion
+---
+
+### Gráfico 3 — Ciclo escolar (semestre) y solicitudes de acceso
+
+Responde a: *¿qué fechas marcan el ciclo?, qué secciones entran en ese ciclo?, quién revisa solicitudes de nuevos orientadores?*
 
 ```mermaid
-flowchart LR
-    O2[orientadores] --> CA2[cargas_alumnos]
-    CA2 --> L2[carga_alumnos_linea]
-    L2 --> P3[padron_alumnos]
+erDiagram
+    orientador_semestre_fechas ||--o{ periodo_institucion_grupos : "ciclo con varias secciones"
+    institucion_grupos ||--o{ periodo_institucion_grupos : "seccion dentro del ciclo"
+    orientadores ||--o{ orientador_solicitudes_acceso : "orientador revisa solicitudes"
 ```
+
+**Explicación de cada relación del gráfico 3**
+
+| Relación | Qué significa |
+|----------|----------------|
+| `orientador_semestre_fechas` → `periodo_institucion_grupos` | El registro de **fechas del ciclo** se enlaza con muchas filas de la tabla puente. |
+| `institucion_grupos` → `periodo_institucion_grupos` | Cada fila puente dice que una **sección** participa en ese **ciclo**. |
+| `orientadores` → `orientador_solicitudes_acceso` | Las **solicitudes de alta** pueden quedar asociadas al orientador que las **revisó** (aceptar o rechazar). |
+
+La tabla **`periodos_academicos`** es **legado** (ventanas por fechas); el flujo principal de semestre usa **`orientador_semestre_fechas`** y **`periodo_institucion_grupos`**.
+
+---
+
+### Tabla `logs` (auditoría)
+
+No va dibujada con flechas fijas hacia una sola entidad porque **registra acciones** sobre muchas tablas (quién, qué, cuándo). Sirve como **historial** del sistema.
+
+---
+
+### Si el gráfico no aparece en GitHub
+
+Pega el bloque en [mermaid.live](https://mermaid.live) o usa vista previa Mermaid en tu editor. Las **tablas de explicación** anteriores describen el mismo modelo aunque falle el dibujo automático.
 
 ---
 
