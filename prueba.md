@@ -1,95 +1,459 @@
-# 9. Justificación de la guía de estilo
+# Base de datos AIDA — diseño (apartado 11)
 
-La interfaz de **AIDA** (web: alumno y orientador) busca ser **clara para usuarios escolares** (alumnos, familias y personal de orientación), **confiable** (sensación de trámite oficial) y **homogénea** entre pantallas. La guía visual no es decoración: reduce errores, acelera el reconocimiento de acciones y favorece la accesibilidad.
+Este documento cubre lo que suele pedirse en **“Diseño de base de datos”**:
 
-## 9.1. Colores (accesibilidad y contraste)
+1. **Diagrama entidad–relación** (Mermaid).
+2. **Descripción de cada entidad / tabla** (lenguaje claro, no técnico).
+3. **Diccionario de datos** (cada campo: tipo en base de datos y qué significa).
 
-- **Texto principal sobre fondo claro:** Se trabaja con tonos **slate** (grises azulados) para el cuerpo de texto, por ejemplo cercanos a `#0F172A` sobre fondos claros como `#F8FAFC`, definidos también en variables globales (`globals.css`). Esta combinación ofrece **buen contraste** para lectura prolongada y cumple objetivos habituales de legibilidad (WCAG) cuando el tamaño de fuente es adecuado.
-- **Color de marca / acciones principales:** El **violeta** (`#7C3AED`, `#5B21B6`, fondos suaves `#EDE9FE`, `#F5F3FF`) identifica acciones positivas del flujo: entrar al panel, confirmar pasos del orientador, enlaces destacados. Se separa del rojo y del verde para no mezclar “marca” con “peligro” o “éxito”.
-- **Semántica por color:**
-  - **Rojo** (`#DC2626`, `#B91C1C`, fondos `#FEF2F2`): cierre de sesión, rechazo, errores o acciones destructivas.
-  - **Azul** (`#2563EB`, `#1D4ED8`, fondos `#DBEAFE`): alternativa clara frente al violeta (por ejemplo “No” en diálogos, estados “activo” en conmutadores).
-  - **Ámbar / naranja:** avisos que no son error fatal (texto informativo o restricciones).
-  - **Verde / esmeralda:** fondos de cabecera del orientador y sensación de “entorno institucional activo”, sin sustituir siempre al violeta en botones principales.
-
-**Justificación:** Un número limitado de familias cromáticas evita fatiga visual y permite que **color = significado** (marca vs. peligro vs. información). El contraste texto/fondo se cuida de forma explícita en componentes críticos (formularios, modales, listas).
-
-## 9.2. Tipografía (legibilidad)
-
-- La aplicación usa la **pila tipográfica del sistema** (fuentes nativas del sistema operativo), con la clase `antialiased` en el cuerpo del documento. **No se carga una familia web propia** en el layout raíz: así se mejora **rendimiento**, se reduce la carga inicial y se mantiene una apariencia familiar en cada dispositivo.
-- **Jerarquía:** títulos en negrita y tamaños mayores (`text-xl`, `text-2xl`, `text-4xl` en flujos clave), texto de apoyo en `text-sm` / `text-xs` y color más suave (`text-slate-500`, `text-slate-600`), de modo que el usuario distingue de un vistazo **qué es título, qué es instrucción y qué es detalle secundario**.
-
-**Justificación:** Priorizar legibilidad y carga rápida encaja con un entorno educativo donde no todos los equipos son de gama alta y el uso puede ser esporádico (padre/alumno desde móvil).
-
-## 9.3. Iconografía
-
-- Se combinan **iconos vectoriales** (por ejemplo en cabeceras o acciones compactas) con **símbolos Unicode / emoji** en algunas listas o botones de acción rápida del panel de cargas (carpeta, intercambio, papelera en contextos muy concretos).
-- Los iconos **no sustituyen** el texto cuando la acción es crítica: se complementan con `aria-label`, `title` o etiquetas visibles para **lectores de pantalla** y para usuarios que no interpretan bien el pictograma.
-
-**Justificación reciente de simplificación:** En el diálogo **«¿Deseas cerrar sesión?»** se **eliminó el icono decorativo** duplicado arriba del título. El botón de cerrar sesión en la barra superior **mantiene** su icono para localizar la acción; el modal se centra en **pregunta + botones Sí/No**, reduciendo ruido visual y duplicidad semántica (mismo mensaje con menos elementos competiendo por atención).
-
-## 9.4. Consistencia
-
-- **Mismo lenguaje de formas:** bordes redondeados generosos (`rounded-xl`, `rounded-2xl`), sombras suaves en tarjetas y modales, mismos grosores de borde en botones secundarios.
-- **Patrones repetibles:** modales a pantalla completa semitransparente, diálogos centrados con `role="dialog"` y título asociado; listas en cajas con borde `slate-200` y fondo blanco o `slate-50`.
-- **Decisiones alineadas con la guía:**
-  - **Historial de carga de alumnos:** se **retiró el botón «Eliminar»** por fila para evitar borrados accidentales y alinear la interfaz con un uso más conservador del historial (la trazabilidad de cargas prima sobre la limpieza agresiva de listados).
-  - **Carreras registradas:** se dejó de mostrar la línea **«Código: …»** y solo el **nombre** como título visible, para que la lista sea más legible para el orientador y el código quede como dato interno del sistema.
-
-**Justificación:** La consistencia reduce la curva de aprendizaje entre secciones (expediente, cargas, carreras, modales). Los ajustes puntuales anteriores refuerzan **menos clutter, más foco en lo esencial**.
+El modelo evoluciona con migraciones; referencia principal: `supabase/` (p. ej. `aida_base_completa.sql`, `schema.sql`, `cargas_alumnos_extension.sql`, `periodos_y_semestre.sql`, `rls_politicas_por_rol.sql`).
 
 ---
 
-# 10. Guía de estilo
+## Diagrama (visión general)
 
-Elemento que define **reglas visuales** concretas para implementación y revisión de pantallas en AIDA (web).
+El diagrama resume **relaciones principales**. Algunas tablas tienen reglas extra (por ejemplo, un alumno en padrón debe tener enlace por token **o** por sección del catálogo).
 
-## 10.1. Paleta de colores (referencia)
+```mermaid
+erDiagram
+	institucion_grupos ||--o| grupo_tokens : "sección y su clave"
+	grupo_tokens ||--o{ padron_alumnos : "alumnos por clave"
+	institucion_grupos ||--o{ padron_alumnos : "alumnos por sección"
+	carreras ||--o{ padron_alumnos : "carrera del alumno"
+	padron_alumnos ||--o| cuentas_alumno : "cuenta web"
+	cuentas_alumno ||--o{ entregas_documento_alumno : "documentos"
+	orientadores ||--o{ cargas_alumnos : "creó la carga"
+	cargas_alumnos ||--o{ carga_alumnos_linea : "filas del lote"
+	padron_alumnos ||--o| carga_alumnos_linea : "expediente en lote"
+	orientadores ||--o{ orientador_institucion_grupos : "asignación"
+	institucion_grupos ||--o{ orientador_institucion_grupos : "sección asignada"
+	orientador_semestre_fechas ||--o{ periodo_institucion_grupos : "ciclo"
+	institucion_grupos ||--o{ periodo_institucion_grupos : "sección en ciclo"
+	orientadores ||--o{ orientador_solicitudes_acceso : "revisó solicitud"
+```
 
-| Uso | Referencia típica (Tailwind / hex) | Notas |
-|-----|-----------------------------------|--------|
-| Texto principal | `slate-900` ≈ `#0F172A` | Cuerpo y títulos fuertes |
-| Texto secundario | `slate-600`, `slate-500` | Ayudas, metadatos |
-| Fondo página | `slate-50`, `#F8FAFC` | Variable `--background` en `:root` |
-| Acento / primario | `violet-600`, `violet-700`, `#7C3AED`, `#5B21B6` | Botones principales orientador |
-| Fondo acento suave | `violet-50`, `violet-100`, `#EDE9FE`, `#F5F3FF` | Listas seleccionadas, modales |
-| Acción destructiva / salir | `red-600`, `red-700`, `#DC2626`, `#B91C1C` | Cerrar sesión (header), inactivar |
-| Información / alternativa | `blue-600`, `sky` | Conmutadores “Activo”, botón “No” |
-| Éxito / institucional | `emerald`, `teal` | Cabeceras, mensajes positivos puntuales |
-| Advertencia | `amber-800`, fondos `amber-50` | Avisos sin bloquear |
-| Bordes neutros | `slate-200`, `#E2E8F0` | Tarjetas, separadores |
+### Bloque “alumnos y documentos”
 
-*No es obligatorio memorizar hex: en código se priorizan **tokens Tailwind** para mantener consistencia.*
+```mermaid
+flowchart LR
+	subgraph escuela["Escuela / secciones"]
+		IG[institucion_grupos]
+		GT[grupo_tokens]
+	end
+	subgraph alumno["Alumno"]
+		P[padron_alumnos]
+		C[cuentas_alumno]
+		E[entregas_documento_alumno]
+	end
+	IG --- GT
+	GT --> P
+	IG --> P
+	P --> C
+	C --> E
+```
 
-## 10.2. Tipografías
+### Bloque “cargas e inscripción”
 
-- **Familia:** sistema (sans-serif del SO), sin fuente custom en `tailwind.config` extend.
-- **Peso:** `font-semibold` / `font-bold` en títulos y botones; `font-medium` en etiquetas de formulario.
-- **Cuerpo:** `text-sm` a `text-base` en formularios y listas; `text-xs` para legales, hints y badges.
-
-## 10.3. Tamaños y espaciados
-
-- **Radios:** `rounded-lg` (8px) en controles pequeños; `rounded-xl` y `rounded-2xl` en tarjetas, modales y botones destacados.
-- **Relleno contenedores:** `p-4`–`p-6` en secciones; `px-3`–`px-6` en cabeceras alineadas con el contenido.
-- **Separación entre bloques:** `gap-2`–`gap-4`, `mt-4`–`mt-8`, `space-y-3` en listas verticales.
-- **Ancho útil:** en algunos flujos `max-w-lg` / `max-w-md` en modales; contenido ancho completo en panel orientador con márgenes laterales (`px-3` sm `px-4` lg `px-6`).
-
-## 10.4. Uso de botones e iconos
-
-- **Primario (acción principal):** fondo violeta o borde violeta fuerte + texto violeta oscuro; hover más oscuro o más saturado.
-- **Secundario / cancelar:** borde `slate` o `blue`, fondo blanco o azul muy claro.
-- **Peligro:** borde y texto rojo, fondo rojo muy claro; usar solo donde la acción sea irreversible o sensible.
-- **Iconos:** tamaños coherentes (`h-5 w-5` a `h-7 w-7` en cabecera); en botones cuadrados, área mínima táctil ~44px (`h-11 w-11` sm `h-12 w-12` donde aplica).
-- **Emoji / símbolos en botones cuadrados:** reservados a acciones muy localizadas (p. ej. fila de tabla); deben tener `title` o contexto de fila para no perder significado.
-
-## 10.5. Reglas de accesibilidad
-
-- **Contraste:** mantener texto de lectura sobre fondo con contraste suficiente; evitar gris claro sobre blanco para texto largo.
-- **Foco y teclado:** botones nativos `<button>`; en modales, cerrar con clic fuera o `Escape` donde esté implementado; no depender solo del color para el estado (añadir texto o posición en conmutadores).
-- **Diálogos:** `role="dialog"`, `aria-modal="true"`, título con `aria-labelledby` apuntando al encabezado visible.
-- **Solo icono:** si un control no muestra texto visible, **obligatorio** `aria-label` o `title` descriptivo (“Cerrar sesión”, “Ver documentos”, etc.).
-- **Estados de carga:** `disabled` + opacidad reducida + texto “Cargando…” / “Guardando…” para no inducir doble clic.
+```mermaid
+flowchart LR
+	O[orientadores] --> CA[cargas_alumnos]
+	CA --> L[carga_alumnos_linea]
+	L --> P[padron_alumnos]
+```
 
 ---
 
-*Documento alineado al proyecto AIDA web (`aida-web`). Las reglas concretas de código siguen evolucionando; ante duda, priorizar consistencia con pantallas ya publicadas del panel orientador y del panel alumno.*
+## Descripción por tabla
+
+### `institucion_grupos`
+
+**Qué es:** El catálogo de **secciones** de la escuela: cada fila es un grado (1.° a 6.°) más una letra de grupo (A, B, C…).
+
+**Para qué sirve:** Ubicar a cada alumno en “qué salón / grupo escolar” pertenece, sin depender solo de la clave de acceso. Es la referencia estable cuando los alumnos avanzan de grado o cuando ya no usan token.
+
+**Relación con otras tablas:** Los **tokens** de grupo pueden enlazarse a una sección concreta. El **padrón** apunta aquí cuando el expediente va anclado a la sección. Los **periodos / semestre** también relacionan secciones con el ciclo escolar.
+
+---
+
+### `grupo_tokens`
+
+**Qué es:** Las **claves** que el orientador entrega (por grupo) para que el alumno entre la primera vez o mientras aplica esa modalidad.
+
+**Para qué sirve:** Validar que solo quien está en la lista institucional puede crear cuenta. Tiene fecha límite de entrega cuando se configura: después de esa fecha el acceso con esa clave deja de valer.
+
+**Relación con otras tablas:** Cada token puede estar ligado a una fila de **`institucion_grupos`**. El **padrón** históricamente salía del token; en instalaciones nuevas el alumno puede quedar más ligado a la **sección** que a la clave.
+
+---
+
+### `carreras`
+
+**Qué es:** El listado de **carreras** que la escuela maneja (nombre y un código interno).
+
+**Para qué sirve:** A partir de cierto grado (desde 2.° en adelante en el modelo AIDA), el alumno o el orientador asignan una carrera al expediente.
+
+**Relación con otras tablas:** Cada expediente en **`padron_alumnos`** puede tener una carrera elegida (o ninguna si aún no aplica).
+
+---
+
+### `padron_alumnos`
+
+**Qué es:** El **expediente institucional** de cada alumno: nombre, grado mostrado, carrera, matrícula, si está activo o en “archivo muerto”, y enlaces a la sección y/o al token.
+
+**Para qué sirve:** Es la “ficha” que usa la escuela para saber quién es el alumno, en qué grupo está y si puede usar la app. Sin estar en esta lista (o sin reglas equivalentes), no hay cuenta válida.
+
+**Relación con otras tablas:** Depende de **`grupo_tokens`** y/o **`institucion_grupos`**. Opcionalmente de **`carreras`**. De aquí nace **`cuentas_alumno`**. Las **líneas de carga** apuntan al mismo expediente para saber en qué lote de inscripción entró.
+
+---
+
+### `cuentas_alumno`
+
+**Qué es:** La **contraseña** (guardada de forma segura) que el alumno definió para entrar al panel.
+
+**Para qué sirve:** Autenticar al alumno en la web sin usar el login de Supabase para alumnos: una cuenta = un expediente.
+
+**Relación con otras tablas:** Exactamente **un** registro por expediente en **`padron_alumnos`**. Las **entregas de documentos** pertenecen a esta cuenta.
+
+---
+
+### `entregas_documento_alumno`
+
+**Qué es:** Cada **documento** que el alumno subió (o que el sistema registró), con su estado: pendiente de revisión, validado o rechazado, y dónde está el archivo.
+
+**Para qué sirve:** Saber qué falta del trámite, qué ya revisó el orientador y conservar la pista del archivo en almacenamiento. Puede incluir datos extra de OCR si se usó.
+
+**Relación con otras tablas:** Pertenece a **`cuentas_alumno`** (y por tanto al mismo alumno del padrón).
+
+---
+
+### `orientadores`
+
+**Qué es:** Las **cuentas del personal** que usan el panel del orientador (correo, nombre, contraseña, si está activo y el tipo de rol en panel).
+
+**Para qué sirve:** Entrar al panel para cargar alumnos, revisar expedientes, plantillas, etc. El rol puede limitar qué ven (por ejemplo, orientador normal vs. jefe).
+
+**Relación con otras tablas:** Crean **`cargas_alumnos`**. Pueden tener **secciones asignadas** en **`orientador_institucion_grupos`**. Pueden aparecer como quien revisó **`orientador_solicitudes_acceso`**.
+
+---
+
+### `orientador_solicitudes_acceso`
+
+**Qué es:** Personas que **pidieron** acceso al panel de orientador y están pendientes, aceptadas o rechazadas.
+
+**Para qué sirve:** Flujo de altas controladas sin dar de alta orientadores a ciegas.
+
+**Relación con otras tablas:** Opcionalmente enlaza con **`orientadores`** cuando alguien ya revisó la solicitud.
+
+---
+
+### `orientador_plantillas`
+
+**Qué es:** Los **PDFs** del “muro” de plantillas y, si aplica, la definición de zonas para rellenar datos del alumno automáticamente.
+
+**Para qué sirve:** Compartir formatos entre orientadores y generar documentos con datos del expediente.
+
+**Relación con otras tablas:** No suele tener claves foráneas a alumnos; es catálogo de archivos de trabajo del orientador.
+
+---
+
+### `cargas_alumnos`
+
+**Qué es:** Un **lote de inscripción**: fecha de cierre común, grado del proceso y letras de grupo incluidas (A, B…).
+
+**Para qué sirve:** Agrupar el alta masiva de alumnos en una misma “encarga” y acotar acciones (por ejemplo, acciones masivas por grupo respecto a esa carga).
+
+**Relación con otras tablas:** La crea un **`orientadores`**. Contiene muchas **`carga_alumnos_linea`**.
+
+---
+
+### `carga_alumnos_linea`
+
+**Qué es:** Cada **alumno concreto** dentro de una carga: nombre, letra de grupo en ese lote y enlace al expediente del padrón.
+
+**Para qué sirve:** Saber exactamente quién entró en qué encarga y con qué grupo letra, sin duplicar el expediente.
+
+**Relación con otras tablas:** Pertenece a **`cargas_alumnos`** y apunta a **`padron_alumnos`**.
+
+---
+
+### `orientador_semestre_fechas`
+
+**Qué es:** Las **fechas de referencia** del calendario escolar para cambios de semestre o procesos automáticos (normalmente una sola fila activa).
+
+**Para qué sirve:** Marcar el ciclo en el que opera la escuela y, junto con otras pantallas, apoyar promoción o cortes de periodo.
+
+**Relación con otras tablas:** Es el “periodo” al que se asocian filas de **`periodo_institucion_grupos`**.
+
+---
+
+### `periodos_academicos`
+
+**Qué es:** Ventanas de fechas (**inicio / fin**) pensadas como periodos académicos.
+
+**Para qué sirve:** En instalaciones antiguas o reportes; el flujo principal de semestre apunta más a **`orientador_semestre_fechas`**.
+
+**Relación con otras tablas:** Tabla relativamente independiente respecto al resto del diagrama principal.
+
+---
+
+### `periodo_institucion_grupos`
+
+**Qué es:** Tabla puente: qué **secciones** del catálogo participan en un **ciclo de semestre** concreto.
+
+**Para qué sirve:** Saber, para ese ciclo, qué grupos (grado + letra) están dados de alta en el periodo.
+
+**Relación con otras tablas:** Une **`orientador_semestre_fechas`** con **`institucion_grupos`**.
+
+---
+
+### `orientador_institucion_grupos`
+
+**Qué es:** Tabla puente: qué **secciones** puede atender cada **orientador** (cuando se usa control fino por asignación).
+
+**Para qué sirve:** Limitar qué expedientes o alumnos ve cada orientador si la política de seguridad lo exige.
+
+**Relación con otras tablas:** Une **`orientadores`** con **`institucion_grupos`**.
+
+---
+
+### `logs`
+
+**Qué es:** **Historial de acciones** relevantes: quién (orientador, sistema o alumno) hizo qué, sobre qué tipo de dato y cuándo.
+
+**Para qué sirve:** Auditoría, trazabilidad y soporte cuando hay que revisar un cambio o un error.
+
+**Relación con otras tablas:** No siempre hay clave foránea estricta; guarda identificadores en texto/JSON para flexibilidad. Algunos cambios en tablas sensibles también pueden registrarse por disparadores automáticos.
+
+---
+
+## Diccionario de datos
+
+En las tablas, **tipo** es el tipo en PostgreSQL/Supabase. Las descripciones son funcionales (qué representa el dato en AIDA).
+
+### `institucion_grupos`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador único de la sección (grado + letra). |
+| `grado` | smallint | Grado escolar de 1 a 6. |
+| `grupo` | text | Letra o clave del grupo (A, B, C…). |
+| `creado_en` | timestamptz | Cuándo se registró esta sección en el catálogo. |
+
+---
+
+### `grupo_tokens`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del token / clave de grupo. |
+| `clave_acceso` | text | Clave que escribe el alumno para validarse (única en el sistema). |
+| `grupo` | text | Letra de grupo asociada a la clave. |
+| `grado` | text | Grado asociado a la clave (como texto, p. ej. "1"). |
+| `creado_en` | timestamptz | Cuándo se creó el token. |
+| `fecha_limite_entrega` | date | Último día en que la clave permite acceso; después queda inactiva. |
+| `institucion_grupo_id` | uuid | Sección del catálogo enlazada (opcional; una clave por sección cuando existe). |
+
+---
+
+### `carreras`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador de la carrera. |
+| `codigo` | text | Código interno único (p. ej. para reportes o integraciones). |
+| `nombre` | text | Nombre visible de la carrera (lo que ve usuario y orientador). |
+
+---
+
+### `padron_alumnos`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del expediente institucional del alumno. |
+| `grupo_token_id` | uuid | Clave de grupo con la que se dio de alta (puede quedar vacío si ya no aplica). |
+| `institucion_grupo_id` | uuid | Sección escolar actual del alumno en el catálogo (obligatorio si no hay token). |
+| `nombre_completo` | text | Nombre del alumno como figura en la lista oficial. |
+| `creado_en` | timestamptz | Alta del registro en padrón. |
+| `grado_alumno` | text | Grado que muestra la app (1–6); si está vacío se deduce del token o la sección. |
+| `carrera_id` | uuid | Carrera elegida; aplica desde 2.°; en 1.° suele ir vacío. |
+| `matricula` | text | Matrícula o clave escolar; típico desde 2.° con carrera. |
+| `archivo_muerto_en` | timestamptz | Si tiene fecha, el expediente está dado de baja (inactivo) hasta reactivar. |
+
+*Restricción:* debe existir **token** y/o **sección** (`institucion_grupo_id`).
+
+---
+
+### `cuentas_alumno`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador de la cuenta de acceso web. |
+| `padron_id` | uuid | Expediente del alumno al que pertenece (uno a uno). |
+| `password_hash` | text | Contraseña protegida (no se guarda la contraseña en claro). |
+| `creado_en` | timestamptz | Cuándo creó contraseña el alumno. |
+| `actualizado_en` | timestamptz | Último cambio de credenciales. |
+
+---
+
+### `entregas_documento_alumno`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador de esta entrega concreta. |
+| `cuenta_id` | uuid | Cuenta del alumno que subió el archivo. |
+| `tipo_documento` | text | Tipo de trámite (constantes en la aplicación, p. ej. CURP, INE…). |
+| `estado` | text | `validado`, `rechazado` o `pendiente_revision_manual`. |
+| `motivo_rechazo` | text | Explicación si fue rechazado. |
+| `ruta_storage` | text | Ubicación del archivo en almacenamiento. |
+| `validacion_automatica` | boolean | Si hubo intento de validación automática. |
+| `subido_en` | timestamptz | Momento de la subida. |
+| `actualizado_en` | timestamptz | Última modificación del registro. |
+| `etiqueta_personalizada` | text | Título legible para adjuntos especiales (p. ej. citatorios). |
+| `ocr_campos` | jsonb | Resultado estructurado del OCR, si se extrajo texto del PDF/imagen. |
+| `ocr_tramite` | text | Tipo de documento usado en el proceso OCR. |
+| `ocr_extraido_en` | timestamptz | Cuándo se ejecutó la extracción OCR. |
+| `ocr_error` | text | Mensaje corto si falló el OCR. |
+
+*Una fila por cuenta y tipo de documento.*
+
+---
+
+### `orientadores`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del orientador. |
+| `email` | text | Correo de acceso al panel (único). |
+| `password_hash` | text | Contraseña protegida del orientador. |
+| `nombre` | text | Nombre para mostrar. |
+| `estado_acceso` | text | `activo` o `inactivo`; si está inactivo no puede iniciar sesión. |
+| `rol_panel` | text | `normal` (panel habitual) o `jefe` (incluye historial global y solicitudes de acceso). |
+| `creado_en` | timestamptz | Alta del orientador. |
+
+---
+
+### `orientador_solicitudes_acceso`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador de la solicitud. |
+| `email` | text | Correo del solicitante (único). |
+| `password_hash` | text | Contraseña que quedará si se acepta la solicitud. |
+| `estado` | text | `pendiente`, `aceptada` o `rechazada`. |
+| `creado_en` | timestamptz | Cuándo envió la solicitud. |
+| `revisado_en` | timestamptz | Cuándo un jefe la revisó. |
+| `revisado_por_orientador_id` | uuid | Orientador que aceptó o rechazó (opcional). |
+
+---
+
+### `orientador_plantillas`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador de la plantilla. |
+| `titulo` | text | Título visible en el muro de plantillas. |
+| `nombre_archivo` | text | Nombre del archivo original. |
+| `ruta_storage` | text | Ubicación del PDF en almacenamiento (única). |
+| `creado_en` | timestamptz | Cuándo se subió. |
+| `definicion_relleno` | jsonb | Coordenadas y campos para rellenar el PDF con datos del alumno. |
+
+---
+
+### `cargas_alumnos`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del lote / encarga. |
+| `orientador_id` | uuid | Orientador que creó la carga. |
+| `fecha_cierre` | date | Fecha de cierre común de acceso para esa inscripción. |
+| `grado_carga` | smallint | Grado del proceso de carga (1–6). |
+| `grupos_letras` | text[] | Letras de grupo incluidas en el lote (A, B…). |
+| `creado_en` | timestamptz | Cuándo se registró la carga. |
+
+---
+
+### `carga_alumnos_linea`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador de la fila dentro del lote. |
+| `carga_id` | uuid | Carga a la que pertenece. |
+| `grupo_letra` | text | Letra de grupo asignada en esa encarga. |
+| `nombre_completo` | text | Nombre del alumno en ese lote. |
+| `padron_id` | uuid | Expediente en padrón vinculado (único: un alumno no se repite en otra línea). |
+
+---
+
+### `orientador_semestre_fechas`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del registro de calendario (suele usarse una fila). |
+| `primer_periodo_fecha` | date | Primera fecha de referencia del ciclo (p. ej. cambio de semestre). |
+| `segundo_periodo_fecha` | date | Segunda fecha de referencia del ciclo. |
+| `nombre_anios` | text | Etiqueta legible del ciclo (p. ej. rango de años). |
+| `actualizado_en` | timestamptz | Última modificación de estas fechas. |
+| `promocion_primer_ejecutada_en` | timestamptz | Marca si ya se aplicó promoción automática para la primera fecha. |
+| `promocion_segundo_ejecutada_en` | timestamptz | Igual para la segunda fecha. |
+
+---
+
+### `periodos_academicos`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del periodo. |
+| `fecha_inicio` | date | Inicio de la ventana. |
+| `fecha_fin` | date | Fin de la ventana (debe ser ≥ inicio). |
+| `creado_en` | timestamptz | Alta del registro. |
+
+*Uso mayormente legado; el flujo principal de semestre usa `orientador_semestre_fechas`.*
+
+---
+
+### `periodo_institucion_grupos`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `periodo_id` | uuid | Ciclo de semestre (`orientador_semestre_fechas.id`). |
+| `institucion_grupo_id` | uuid | Sección del catálogo incluida en ese ciclo. |
+| `asignado_en` | timestamptz | Cuándo se hizo el vínculo. |
+
+*Clave primaria compuesta: (`periodo_id`, `institucion_grupo_id`).*
+
+---
+
+### `orientador_institucion_grupos`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `orientador_id` | uuid | Orientador. |
+| `institucion_grupo_id` | uuid | Sección que puede atender. |
+| `creado_en` | timestamptz | Cuándo se asignó. |
+
+*Clave primaria compuesta: (`orientador_id`, `institucion_grupo_id`).*
+
+---
+
+### `logs`
+
+| Campo | Tipo | Descripción |
+|--------|------|-------------|
+| `id` | uuid | Identificador del evento de auditoría. |
+| `creado_en` | timestamptz | Momento del registro. |
+| `actor_tipo` | text | Quién actuó: `orientador`, `sistema` o `alumno`. |
+| `actor_id` | uuid | Identificador del actor cuando aplica (puede ir vacío). |
+| `actor_etiqueta` | text | Texto legible del actor (correo, “sistema”, etc.). |
+| `accion` | text | Qué ocurrió, en lenguaje descriptivo o código de acción. |
+| `entidad` | text | Sobre qué tabla o tipo de dato (p. ej. `padron_alumnos`). |
+| `entidad_id` | text | Identificador del registro afectado, en texto. |
+| `detalle` | jsonb | Información extra (antes/después, contadores, etc.). |
+| `origen` | text | `api` (acción desde la aplicación) o `trigger` (registro automático en base de datos). |
+
+---
+
+## Nota final
+
+- Las **funciones** y **disparadores** en SQL (por ejemplo archivar o reactivar expedientes, registrar log) automatizan reglas de negocio; no son “tablas”, pero escriben en **`padron_alumnos`** y **`logs`**.
+- Si el entorno usa **solo la API con rol de servicio**, muchas políticas de visibilidad (RLS) no se notan en el día a día; igual conviene conocer el modelo para entender la app.
+
+*Última revisión alineada con el repositorio AIDA (esquema Supabase + extensiones de cargas, periodos y padrón por sección).*
