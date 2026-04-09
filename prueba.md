@@ -14,51 +14,71 @@ El modelo evoluciona con migraciones; referencia principal: `supabase/` (p. ej. 
 
 El diagrama resume **relaciones principales**. Algunas tablas tienen reglas extra (por ejemplo, un alumno en padrón debe tener enlace por token **o** por sección del catálogo).
 
+El bloque siguiente usa **códigos cortos** y **etiquetas solo en ASCII** para que GitHub pueda renderizar Mermaid sin error (el renderizador de GitHub suele fallar con `erDiagram` muy largos, guiones bajos en nombres o caracteres acentuados en etiquetas). Leyenda justo debajo.
+
 ```mermaid
 erDiagram
-	institucion_grupos ||--o| grupo_tokens : "sección y su clave"
-	grupo_tokens ||--o{ padron_alumnos : "alumnos por clave"
-	institucion_grupos ||--o{ padron_alumnos : "alumnos por sección"
-	carreras ||--o{ padron_alumnos : "carrera del alumno"
-	padron_alumnos ||--o| cuentas_alumno : "cuenta web"
-	cuentas_alumno ||--o{ entregas_documento_alumno : "documentos"
-	orientadores ||--o{ cargas_alumnos : "creó la carga"
-	cargas_alumnos ||--o{ carga_alumnos_linea : "filas del lote"
-	padron_alumnos ||--o| carga_alumnos_linea : "expediente en lote"
-	orientadores ||--o{ orientador_institucion_grupos : "asignación"
-	institucion_grupos ||--o{ orientador_institucion_grupos : "sección asignada"
-	orientador_semestre_fechas ||--o{ periodo_institucion_grupos : "ciclo"
-	institucion_grupos ||--o{ periodo_institucion_grupos : "sección en ciclo"
-	orientadores ||--o{ orientador_solicitudes_acceso : "revisó solicitud"
+    IG ||--o| GT : section_token
+    GT ||--o{ PA : roster_token
+    IG ||--o{ PA : roster_section
+    CR ||--o{ PA : career
+    PA ||--o| CA : account
+    CA ||--o{ ED : uploads
+    OR ||--o{ CG : creates
+    CG ||--o{ CL : lines
+    PA ||--o| CL : roster_line
+    OR ||--o{ OIG : staff
+    IG ||--o{ OIG : section
+    OSF ||--o{ PIG : semester
+    IG ||--o{ PIG : section_sem
+    OR ||--o{ OSA : reviews
 ```
 
-### Bloque “alumnos y documentos”
+| Código | Tabla real |
+|--------|------------|
+| IG | `institucion_grupos` |
+| GT | `grupo_tokens` |
+| PA | `padron_alumnos` |
+| CR | `carreras` |
+| CA | `cuentas_alumno` |
+| ED | `entregas_documento_alumno` |
+| OR | `orientadores` |
+| CG | `cargas_alumnos` |
+| CL | `carga_alumnos_linea` |
+| OSF | `orientador_semestre_fechas` |
+| PIG | `periodo_institucion_grupos` |
+| OIG | `orientador_institucion_grupos` |
+| OSA | `orientador_solicitudes_acceso` |
+
+*Alternativa si aún así no se ve en GitHub:* pegar el mismo `erDiagram` en [mermaid.live](https://mermaid.live) o usar una extensión Mermaid en el editor.
+
+### Bloque alumnos y documentos
 
 ```mermaid
 flowchart LR
-	subgraph escuela["Escuela / secciones"]
-		IG[institucion_grupos]
-		GT[grupo_tokens]
-	end
-	subgraph alumno["Alumno"]
-		P[padron_alumnos]
-		C[cuentas_alumno]
-		E[entregas_documento_alumno]
-	end
-	IG --- GT
-	GT --> P
-	IG --> P
-	P --> C
-	C --> E
+    subgraph SCH[School sections]
+        IG2[institucion_grupos]
+        GT2[grupo_tokens]
+    end
+    subgraph STU[Student]
+        P2[padron_alumnos]
+        C2[cuentas_alumno]
+        E2[entregas_documento_alumno]
+    end
+    IG2 --- GT2
+    GT2 --> P2
+    IG2 --> P2
+    P2 --> C2
+    C2 --> E2
 ```
 
-### Bloque “cargas e inscripción”
+### Bloque cargas e inscripcion
 
 ```mermaid
 flowchart LR
-	O[orientadores] --> CA[cargas_alumnos]
-	CA --> L[carga_alumnos_linea]
-	L --> P[padron_alumnos]
+    O2[orientadores] --> CA2[cargas_alumnos]
+    CA2 --> L2[carga_alumnos_linea]
+    L2 --> P3[padron_alumnos]
 ```
 
 ---
